@@ -8,7 +8,7 @@ from math import *
 from datetime import datetime
 from datetime import datetime
 
-from camera import get_image, cam_pose_to_world_pose
+from camera_for_base import get_image, cam_pose_to_world_pose
 from sphere_fitting import sphereFit
 from cam_ik import accurateIK
 
@@ -156,7 +156,7 @@ p.setRealTimeSimulation(useRealTimeSimulation)
 
 
 
-"""
+
 t = 0.
 #prevPose = [0, 0, 0]
 #prevPose1 = [0, 0, 0]
@@ -182,10 +182,17 @@ wheelVelocities = [0, 0, 0, 0]
 wheelDeltasTurn = [1, -1, 1, -1]
 wheelDeltasFwd = [1, 1, 1, 1]
 
+I,Dbuf,Sbuf = get_image(kukaId)
+
 while (True):
 	p.stepSimulation()
 	time.sleep(1./240.)
-
+	# try:
+	# a, b, c = get_image(baseId)
+	# print(type(a), " ", type(b), " ", type(c))
+	# except:
+		# print("can't get image")
+	I,Dbuf,Sbuf = get_image(baseId)
 	keys = p.getKeyboardEvents()
 	shift = 0.01
 	speed = 0.240

@@ -39,7 +39,7 @@ def cam_pose_to_world_pose(camTargetPos,robotID,camTargetOrn=default_orn):
 	return p.multiplyTransforms(pos,ort,epos,eorn)
 
 def get_image(robotID,width=200,height=200):
-	cam_link_state = p.getLinkState(robotID,linkIndex=5,computeForwardKinematics=1)
+	cam_link_state = p.getLinkState(robotID,linkIndex=4,computeForwardKinematics=1)
 	pos=cam_link_state[-2]
 	ort=cam_link_state[-1]
 	rot_mat=np.array(p.getMatrixFromQuaternion(ort))
