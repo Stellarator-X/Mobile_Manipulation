@@ -99,7 +99,10 @@ if __name__ == "__main__":
 		cubeStartOrientation = p.getQuaternionFromEuler([0,0,0])
 		p.loadURDF("plane_implicit.urdf", [0, 0, 0], useFixedBase=True)
 
-		target_id = p.loadURDF("cube.urdf", [5., 5., 0.5])
+		target_id = p.loadURDF("cube.urdf", [6., 6., 0.5])
+		target_id = p.loadURDF("cube.urdf", [-1., 0., 0.5])
+		target_id = p.loadURDF("cube.urdf", [6., -6., 0.5])
+		
 
 		baseCenter = [0.0,0.0,0.25]
 		baseOrientation = p.getQuaternionFromEuler([0,0,0])
@@ -114,43 +117,47 @@ if __name__ == "__main__":
 		print(f"Base Length = {base_length:.2f}")
 		print(f"Link coordinates : {p.getJointInfo(baseId, 0)[-3]}")
 	
-	GOAL_POSE = Pose(-5, -5, 0)
-	START_POSE = Pose(0, 0, 0)
-	base_pose = START_POSE
-	wheels = [0, 1, 2, 3]
-	wheelVelocities = [0, 0, 0, 0]
+	GOALS = [Pose(5, 5, 0), Pose(5, -5, 0), Pose(0, 0, 0)]
+	base_pose = Pose(0, 0, 0)
 
-	base_bot = Agent(start_pose = base_pose)
-	
-	prev_t = time.time()
-	p.stepSimulation()
-	pose, orientation  = p.getBasePositionAndOrientation(baseId)
-	prev_x = pose[0]
-	velocities = []
+	for GOAL_POSE in GOALS : 
+		print()
+		print(f"Target : ({GOAL_POSE.x},{GOAL_POSE.y})")
+		START_POSE = base_pose
+		
+		wheels = [0, 1, 2, 3]
+		wheelVelocities = [0, 0, 0, 0]
 
-	while True: # Simulation Loop
-		time.sleep(1/240.)
-		I,Dbuf,Sbuf = get_image(baseId)
-
-		# Getting odometry 
-		# TODO @stellarator-x : Change all make all odometry simulator independent. 
-		pose, orientation  = p.getBasePositionAndOrientation(baseId)
-		orientation = p.getEulerFromQuaternion(orientation)
-		_, _, theta = orientation
-		base_pose.x, base_pose.y, base_pose.theta = pose[0], pose[1], theta 
-		base_bot.set_pose(base_pose)
-
-		target_v, target_w = base_bot.get_target_velocity(GOAL_POSE, START_POSE)
-		wheelVelocities = base_bot.get_wheel_velocities(target_v, target_w)
-
-
-
-		for i in range(len(wheels)):
-			p.setJointMotorControl2(baseId,wheels[i],p.VELOCITY_CONTROL,targetVelocity=wheelVelocities[i],force=100)
-
-		if (useRealTimeSimulation):
-			t = time.time() 
-		else:
-			t += time_step
-
+		base_bot = Agent(start_pose = base_pose)
+		
+		prev_t = time.time()
 		p.stepSimulation()
+		pose, orientation  = p.getBasePositionAndOrientation(baseId)
+		prev_x = pose[0]
+		velocities = []
+		done = False
+		while not done: # Simulation Loop
+			time.sleep(1/240.)
+			I,Dbuf,Sbuf = get_image(baseId)
+			# Getting odometry 
+			# TODO @stellarator-x : Change all make all odometry simulator independent. 
+			pose, orientation  = p.getBasePositionAndOrientation(baseId)
+			orientation = p.getEulerFromQuaternion(orientation)
+			_, _, theta = orientation
+			base_pose.x, base_pose.y, base_pose.theta = pose[0], pose[1], theta 
+			base_bot.set_pose(base_pose)
+
+			target_v, target_w, done = base_bot.get_target_velocity(GOAL_POSE, START_POSE)
+			wheelVelocities = base_bot.get_wheel_velocities(target_v, target_w)
+
+
+
+			for i in range(len(wheels)):
+				p.setJointMotorControl2(baseId,wheels[i],p.VELOCITY_CONTROL,targetVelocity=wheelVelocities[i],force=100)
+
+			if (useRealTimeSimulation):
+				t = time.time() 
+			else:
+				t += time_step
+
+			p.stepSimulation()

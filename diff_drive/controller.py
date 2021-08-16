@@ -1,5 +1,7 @@
 from math import atan2
-import numpy as np 
+import numpy as np
+from numpy.core.numeric import True_ 
+from utils import mask_points
 
 class Pose():
     def __init__(self, x, y, theta):
@@ -9,7 +11,7 @@ class Pose():
 
 class Agent():
 
-    def __init__(self,wheel_radius = 0.034, base_length = 0.50, start_pose = Pose(0, 0, 0), V_MAX = 2, W_MAX = 3):
+    def __init__(self,wheel_radius = 0.034, base_length = 0.50, start_pose = Pose(0, 0, 0), V_MAX = 1.5, W_MAX = 5):
         self.base_length = base_length
         self.pose = start_pose
         self.wheel_radius = wheel_radius
@@ -29,6 +31,11 @@ class Agent():
     def set_pose(self, pose):
         self.pose = pose
 
+    def sgn(self, theta):
+        cosine = np.cos(theta)
+        if cosine < 0: return -1
+        else: return 1
+
     def set_pose2(self, x, y, theta):
         self.pose.x = x
         self.pose.y = y
@@ -45,23 +52,66 @@ class Agent():
         v_l = (2*v - w*self.base_length)/(2*self.wheel_radius)
         return [v_l, v_r, v_l, v_r]
 
+    def find_target(self, segmentation_mask, depth_mask, target_mask_id):
+        """
+        # Things we need to do
+        1. Find whether the seg mask has the target id.
+        2. Find the nearest point of target blob, if 1. returns true : Find argmin of mask*depth maybe.
+        3. Find the distance of the blob from the base.
+        """
+        
+        ids = np.unique(segmentation_mask)
+        if target_mask_id in ids:
+            X, Y, Z = mask_points(segmentation_mask, depth_mask, target_mask_id)
+            idx = np.argmin(X)
+            a, b = X[idx], Y[idx]
+            # g_x = self.pose.x + a*np.sin(self.pose.theta) + b*np.cos(self.pose.theta)
+            # g_y = self.pose.y + a*np.cos(self.pose.theta) - b*np.sin(self.pose.theta)
+            g_x = self.pose.x + a*np.cos(self.pose.theta) - b*np.sin(self.pose.theta)
+            g_y = self.pose.y + a*np.sin(self.pose.theta) + b*np.cos(self.pose.theta)
+            
+            return Pose(g_x, g_y, 0)
+        else :
+            return None
+               
+
+
     def get_target_velocity(self, goal_pose, start_pose):
         # Returns v, w required as per unicycle model.
-        epsilon = 0.01
+        epsilon = 0.05
+        reached = False
+        
         max_dist = self.get_distance2(start_pose, goal_pose)
         linear_distance = self.get_distance(goal_pose)
         target_angle = atan2(goal_pose.y-self.pose.y, goal_pose.x - self.pose.x)
         angular_offset = target_angle - self.pose.theta
+
+        if angular_offset<-np.pi:
+            angular_offset += 2*np.pi 
+        elif angular_offset>np.pi:
+            angular_offset -= 2*np.pi 
+
+        assert (-np.pi <= angular_offset <= np.pi), f"Angular Offset  = {angular_offset}"
+
         print(f"\rTarget_Angle : {angular_offset:.3f}, Target_Distance : {linear_distance:.3f}", end = "")
 
-        # Step 1 - rotate to desired orientation
-        if (abs(angular_offset) > epsilon):
+        
+        if (linear_distance<epsilon*10):
+            v = w = 0
+            reached = True
+        elif (abs(angular_offset) > epsilon):
             w = self.w_max*(angular_offset)/np.pi
-            # v = self.v_max*(linear_distance)/max_dist
-            v = 0
-        elif (linear_distance > epsilon*50):
-            w = 0
-            v = np.cos(angular_offset)/abs(np.cos(angular_offset))*self.v_max*(linear_distance)/max_dist
-        else : 
-            w = v = 0
-        return v, w
+            v = self.sgn(angular_offset)*self.v_max/10
+        elif (linear_distance > epsilon*10):
+            w = self.sgn(angular_offset)*self.w_max/10
+            v = self.sgn(angular_offset)*self.v_max*(linear_distance)/max_dist
+        
+
+        # if (linear_distance < epsilon*10) and (abs(angular_offset) < epsilon) :
+        #     w = v = 0
+        #     reached = True
+        # else:
+        #     w = self.w_max*(angular_offset)/np.pi
+        #     v = self.sgn(angular_offset)*self.v_max*(linear_distance)/max_dist
+
+        return v, w, reached

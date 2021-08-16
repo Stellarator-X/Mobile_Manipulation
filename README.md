@@ -12,4 +12,9 @@ pip install pybullet (or) pip3 install pybullet
 python3 pbvs.py
 ```
 
-![alt text](https://github.com/pvrohin/pbvs_in_pybullet/blob/master/pbvs_demo.png)
+![alt text](images/pbvs_demo.png)
+
+
+## Progress
+
+1. [Differential Drive](diff_drive)
