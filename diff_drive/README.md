@@ -8,4 +8,4 @@ The diff_drive agent follows a simple unicycle model for target estimation and c
 1. [Following a polygon given vertex coordinates.](../base_control.py)
 2. [Detecting and seeking targets through image segmentation buffers](../base_explore.py)
 
-[Exploration_Demo](demos/exploration.gif)
+![Exploration_Demo](demos/exploration.gif)
