@@ -113,7 +113,7 @@ class Agent():
         if (linear_distance<epsilon*10):
             v = w = 0
             reached = True
-            print("Target reached.")
+            print("\nTarget reached.")
         elif (abs(angular_offset) > epsilon):
             w = self.w_max*(angular_offset)/np.pi
             v = self.sgn(angular_offset)*self.v_max/10

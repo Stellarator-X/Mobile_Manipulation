@@ -231,7 +231,7 @@ if __name__ == "__main__":
 			est_pose = base_bot.estimate(est_pose, target_v, target_w, dt)
 
 			err_d.append(np.linalg.norm([est_pose.x - base_pose.x, est_pose.y - base_pose.y]))
-			err_theta.append(np.cos(est_pose.theta - base_pose.theta)); 
+			err_theta.append(1- np.cos(est_pose.theta - base_pose.theta)); 
 
 			p.stepSimulation()
 
@@ -240,8 +240,9 @@ if __name__ == "__main__":
 	_, (a1, a2) = plt.subplots(1, 2)
 	a1.plot(err_d, label = "err_distance")
 	a1.legend()
-	a2.plot(err_theta, label="cos_err_theta")
-	a2.legend()
+	a2.plot(err_theta, label="cos_err_theta = 1 - cos(d)")
+	a2.legend()	
+	plt.title("Error vs Iterations")
 	plt.legend()
 	plt.show()
 
