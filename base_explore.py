@@ -6,13 +6,14 @@ import numpy as np
 from math import *
 
 from datetime import datetime
-from datetime import datetime
 
 from camera import get_image, cam_pose_to_world_pose
 from sphere_fitting import sphereFit
 from cam_ik import accurateIK
 from camera_for_base import get_image
 from diff_drive.controller import Agent, Pose
+
+import matplotlib.pyplot as plt 
 
 fov = 50
 aspect = 1
@@ -35,7 +36,6 @@ def pix_to_ee_frame(x_pix,y_pix,d):
 	Ye = -Xc
 	Ze = -Yc
 	return(Xe,Ye,Ze)
-
 
 def mask_points(Sbuf,Dbuf,appleId):
     depthImg_buf = np.reshape(Dbuf, [width, height])
@@ -101,17 +101,32 @@ if __name__ == "__main__":
 		f_y = height/(2*tan(fov*pi/360))
 
 	if True: # Set up the environment
+		import env
 		cubeStartOrientation = p.getQuaternionFromEuler([0,0,0])
-		p.loadURDF("plane_implicit.urdf", [0, 0, 0], useFixedBase=True)
 
-		target_id = p.loadURDF("cube.urdf", [4., 4., 0.5])
-		target_id = p.loadURDF("cube.urdf", [-1., 0., 0.5])
-		target_id = p.loadURDF("cube.urdf", [4., -4., 0.5])
+		cubeStartPos = [5,0,-21.5]
+		treeStartOrientation = p.getQuaternionFromEuler([np.pi/2,0,0])
+		# treeId = p.loadURDF("arbre/arbre.urdf",cubeStartPos, treeStartOrientation, flags=p.URDF_USE_INERTIA_FROM_FILE)
+		target_IDs = []
+		target_IDs.append(p.loadURDF("arbre/arbre.urdf",[7., 7., -21.5], treeStartOrientation, flags=p.URDF_USE_INERTIA_FROM_FILE))
+		target_IDs.append(p.loadURDF("arbre/arbre.urdf",[-5., 0., -21.5], treeStartOrientation, flags=p.URDF_USE_INERTIA_FROM_FILE))
+		target_IDs.append(p.loadURDF("arbre/arbre.urdf",[7., -7., -21.5], treeStartOrientation, flags=p.URDF_USE_INERTIA_FROM_FILE))
+		
+		
+		# target_id = p.loadURDF("cube.urdf", [4., 4., 0.5])
+		# target_id = p.loadURDF("cube.urdf", [-1., 0., 0.5])
+		# target_id = p.loadURDF("cube.urdf", [4., -4., 0.5])
 		
 
 		baseCenter = [0.0,0.0,0.25]
 		baseOrientation = p.getQuaternionFromEuler([0,0,0])
 		baseId = p.loadURDF("ur_description/urdf/mobile_base_without_arm.urdf",baseCenter , cubeStartOrientation,useFixedBase=False)
+		
+		# try:
+		# 	pineId = p.loadSDF("robot_description/worlds/obstacles.world")
+		# except:
+		# 	print("Can't import SDF")
+		# 	input()
 
 		number_of_joints = p.getNumJoints(baseId)
 		for joint_number in range(number_of_joints):
@@ -122,12 +137,19 @@ if __name__ == "__main__":
 		print(f"Base Length = {base_length:.2f}")
 		print(f"Link coordinates : {p.getJointInfo(baseId, 0)[-3]}")	
 	
-	GOAL_IDS = [1, 3, 2]
+	
+	
+	GOAL_IDS = [1, 2, 3]
 	base_pose = Pose(0, 0, 0)
 	base_bot = Agent(start_pose = base_pose)
 	wheels = [0, 1, 2, 3]
 	wheelVelocities = [0, 0, 0, 0]
-	input()
+	prev_t = time.time()
+	est_pose = Pose(0, 0, 0)
+
+	err_d = []
+	err_theta = []
+
 	for target_id in GOAL_IDS : 
 		print()
 		target = None
@@ -137,6 +159,7 @@ if __name__ == "__main__":
 		while target == None:
 			time.sleep(1/240.)
 			I,Dbuf,Sbuf = get_image(baseId)
+			
 			pose, orientation  = p.getBasePositionAndOrientation(baseId)
 			orientation = p.getEulerFromQuaternion(orientation)
 			_, _, theta = orientation
@@ -173,13 +196,15 @@ if __name__ == "__main__":
 		# velocities = []
 		done = False
 		while not done: # Simulation Loop
-			time.sleep(1/240.)
+			time.sleep(1/240.)	
 			I,Dbuf,Sbuf = get_image(baseId)
-
-			# print(np.unique(Sbuf))
+			# print(np.unique(Dbuf))
+			# print(np.max(Dbuf), np.min(Dbuf))
+			
 			target = base_bot.find_target(Sbuf, Dbuf, target_id)
 			if target!=None:
 				GOAL_POSE = target
+				# print("target at di")
 			# Getting odometry 
 			# TODO @stellarator-x : Change all make all odometry simulator independent. 
 			pose, orientation  = p.getBasePositionAndOrientation(baseId)
@@ -188,19 +213,35 @@ if __name__ == "__main__":
 			base_pose.x, base_pose.y, base_pose.theta = pose[0], pose[1], theta 
 			base_bot.set_pose(base_pose)
 
-			target_v, target_w, done = base_bot.get_target_velocity(GOAL_POSE, START_POSE)
+			target_v, target_w, done = base_bot.get_target_velocity(GOAL_POSE, START_POSE, )
 			wheelVelocities = base_bot.get_wheel_velocities(target_v, target_w)
 
 
 
-			for i in range(len(wheels)):
+			for i in range(len(wheels)):	
 				p.setJointMotorControl2(baseId,wheels[i],p.VELOCITY_CONTROL,targetVelocity=wheelVelocities[i],force=100)
 
 			if (useRealTimeSimulation):
 				t = time.time() 
+				dt = t - prev_t
 			else:
 				t += time_step
+				dt = time_step
+
+			est_pose = base_bot.estimate(est_pose, target_v, target_w, dt)
+
+			err_d.append(np.linalg.norm([est_pose.x - base_pose.x, est_pose.y - base_pose.y]))
+			err_theta.append(np.cos(est_pose.theta - base_pose.theta)); 
 
 			p.stepSimulation()
 
-	time.sleep(5)
+	time.sleep(3)
+
+	_, (a1, a2) = plt.subplots(1, 2)
+	a1.plot(err_d, label = "err_distance")
+	a1.legend()
+	a2.plot(err_theta, label="cos_err_theta")
+	a2.legend()
+	plt.legend()
+	plt.show()
+
