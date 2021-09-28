@@ -103,7 +103,7 @@ for i in range (10000):
     user_input_left = p.readUserDebugParameter(gripper_left)
     user_input_right = p.readUserDebugParameter(gripper_right)
     p.setJointMotorControl2(kukaId,14,p.POSITION_CONTROL,targetPosition=user_input_left)
-    p.setJointMotorControl2(kukaId,16,p.POSITION_CONTROL,targetPosition=user_input_right)
+    p.setJointMotorControl2(kukaId,15,p.POSITION_CONTROL,targetPosition=user_input_right)
     p.stepSimulation()
     time.sleep(1./240.)
     I,Dbuf,Sbuf = get_image(baseId)
